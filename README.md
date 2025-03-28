@@ -1,5 +1,32 @@
 # waoo
 
+a simple eBPF program writen by rust/aya 
+
+```
+A simple eBPF program
+
+Usage: waoo <COMMAND>
+
+Commands:
+  opensnoop  Tracing open syscalls
+  killsnoop  Tracing kill syscalls
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+```
+
+打印服务器发送kill命令的服务。
+```
+cargo run --release --config 'target."cfg(all())".runner="sudo -E"' -- killsnoop
+Tracing kill syscalls... Hit Ctrl-C to end.
+KILLER COMM             SIG  PID RET
+Waiting for Ctrl-C...
+531700 code    0 203 0
+  1204 background moni    0 1403 0
+  1204 background moni    0   0 0
+```
+
 ## Prerequisites
 
 1. stable rust toolchains: `rustup toolchain install stable`

@@ -1,11 +1,13 @@
+#![no_std]
+#![no_main]
 use aya_ebpf::{
     helpers,
-    macros::{map, tracepoint},
+    macros::map,
     maps::{HashMap, PerfEventArray},
     programs::TracePointContext,
     EbpfContext,
 };
-use waoo_common::{OpenLog, NAME_MAX_LEN};
+use waoo_common::{KillLog, OpenLog, COMM_MAX_LEN, NAME_MAX_LEN};
 
 use crate::read_at;
 
@@ -15,6 +17,14 @@ static OPEN_MAPS: HashMap<u64, [u8; NAME_MAX_LEN]> = HashMap::with_max_entries(1
 
 #[map(name = "open_events")]
 static OPEN_EVENTS: PerfEventArray<OpenLog> = PerfEventArray::new(0);
+
+#[map(name = "kill_events")]
+static KILL_EVENTS: PerfEventArray<KillLog> = PerfEventArray::new(0);
+
+// (pid, sig)
+#[map]
+static KILL_MAPS: HashMap<u64, (u64, u64)> = HashMap::with_max_entries(1024, 0);
+
 /**
  *
 sudo cat /sys/kernel/debug/tracing/events/syscalls/sys_exit_open/format
@@ -134,5 +144,72 @@ pub fn try_sys_enter_openat(ctx: TracePointContext) -> Result<u32, u32> {
             .map_err(|e| e as u32)?;
     };
     OPEN_MAPS.insert(&tid, &filename, 0).map_err(|e| e as u32)?;
+    Ok(0)
+}
+/**
+ * 
+sudo cat /sys/kernel/debug/tracing/events/syscalls/sys_enter_kill/format
+name: sys_enter_kill
+ID: 184
+format:
+        field:unsigned short common_type;       offset:0;       size:2; signed:0;
+        field:unsigned char common_flags;       offset:2;       size:1; signed:0;
+        field:unsigned char common_preempt_count;       offset:3;       size:1; signed:0;
+        field:int common_pid;   offset:4;       size:4; signed:1;
+
+        field:int __syscall_nr; offset:8;       size:4; signed:1;
+        field:pid_t pid;        offset:16;      size:8; signed:0;
+        field:int sig;  offset:24;      size:8; signed:0;
+
+print fmt: "pid: 0x%08lx, sig: 0x%08lx", ((unsigned long)(REC->pid)), ((unsigned long)(REC->sig))
+
+ */
+pub fn try_enter_kill(ctx: TracePointContext)->Result<u32, u32>{
+    let pid:u64 = read_at(&ctx, 16)?;
+    let sig:u64 = read_at(&ctx, 24)?;
+    let tid: u64 = helpers::bpf_get_current_pid_tgid();
+    // info!(&ctx, "{} send {} signal to {}", sig, sig, pid);
+    let _ = KILL_MAPS.insert(&tid, &(pid, sig), 0);
+    Ok(0)
+}
+
+/**
+sudo cat /sys/kernel/debug/tracing/events/syscalls/sys_exit_kill/format
+name: sys_exit_kill
+ID: 183
+format:
+        field:unsigned short common_type;       offset:0;       size:2; signed:0;
+        field:unsigned char common_flags;       offset:2;       size:1; signed:0;
+        field:unsigned char common_preempt_count;       offset:3;       size:1; signed:0;
+        field:int common_pid;   offset:4;       size:4; signed:1;
+
+        field:int __syscall_nr; offset:8;       size:4; signed:1;
+        field:long ret; offset:16;      size:8; signed:1;
+
+print fmt: "0x%lx", REC->ret
+
+ */
+pub fn try_exit_kill(ctx: TracePointContext)->Result<u32, u32>{
+    let killer = ctx.pid();
+    let mut c = [0u8; COMM_MAX_LEN];
+    c [0] = b'-';
+    let comm = ctx.command().unwrap_or(c);
+    let tid: u64 = helpers::bpf_get_current_pid_tgid();
+    let (pid, sig) =unsafe {
+        KILL_MAPS.get(&tid).ok_or(0u32).map_err(|e| e 
+            )?
+    };
+    let data = KillLog{
+        killer,
+        pid: pid.clone() as u32,
+        sig: sig.clone(),
+        comm,
+        nsec: unsafe {
+            helpers::bpf_ktime_get_ns()
+        },
+        errno: read_at(&ctx, 16)?,
+    };
+    KILL_EVENTS.output(&ctx, &data, 0);
+    let _ = KILL_MAPS.remove(&tid);
     Ok(0)
 }

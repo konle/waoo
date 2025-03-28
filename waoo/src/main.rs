@@ -1,3 +1,4 @@
+use killsnoop::killsnoop;
 #[rustfmt::skip]
 use log::{debug, warn};
 use tokio::signal;
@@ -5,6 +6,7 @@ use tokio::signal;
 mod args;
 mod opensnoop;
 mod program;
+mod killsnoop;
 use opensnoop::opensnoop;
 
 #[tokio::main]
@@ -40,7 +42,9 @@ async fn main() -> anyhow::Result<()> {
         args::Commands::Opensnoop {} => {
             opensnoop(&mut ebpf).await?;
         }
-        args::Commands::Killsnoop {} => {}
+        args::Commands::Killsnoop {} => {
+            killsnoop(&mut ebpf).await?;
+        }
     }
 
     // let program: &mut TracePoint = ebpf.program_mut("waoo").unwrap().try_into()?;

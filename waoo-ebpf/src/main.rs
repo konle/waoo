@@ -1,14 +1,11 @@
 #![no_std]
 #![no_main]
 use aya_ebpf::{
-    helpers,
-    macros::{map, tracepoint},
-    maps::{HashMap, PerfEventArray},
+    macros::tracepoint,
     programs::TracePointContext,
-    EbpfContext,
 };
 
-use waoo_ebpf::try_sys_enter_open;
+use waoo_ebpf::{try_enter_kill, try_exit_kill, try_sys_enter_open};
 use waoo_ebpf::try_sys_enter_openat;
 use waoo_ebpf::try_sys_exit_open;
 
@@ -45,7 +42,21 @@ pub fn trace_sys_enter_openat(ctx: TracePointContext) -> u32 {
     }
 }
 
+#[tracepoint]
+pub fn trace_enter_kill(ctx: TracePointContext)->u32{
+    match try_enter_kill(ctx) {
+        Ok(ret) => ret,
+        Err(ret) => ret,
+    }
+}
 
+#[tracepoint]
+pub fn trace_exit_kill(ctx: TracePointContext)->u32{
+    match try_exit_kill(ctx) {
+        Ok(ret) => ret,
+        Err(ret) => ret,
+    }
+}
 
 #[cfg(not(test))]
 #[panic_handler]

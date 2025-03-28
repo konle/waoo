@@ -7,6 +7,7 @@ mod open;
 pub use open::try_sys_enter_open;
 pub use open::try_sys_enter_openat;
 pub use open::try_sys_exit_open;
+pub use open::{try_enter_kill, try_exit_kill};
 
 
 pub fn read_at<T>(ctx: &TracePointContext, offset: usize)->Result<T, u32>{

@@ -13,6 +13,7 @@ pub struct Argument{
 pub enum Commands {
     #[command(about="Tracing open syscalls")]
     Opensnoop{},
+    #[command(about="Tracing kill syscalls")]
     Killsnoop{},
 }
 

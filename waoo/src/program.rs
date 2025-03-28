@@ -30,7 +30,7 @@ enum Category {
 }
 
 impl ProgramBuilder {
-     fn new() -> Self {
+    fn new() -> Self {
         ProgramBuilder {
             name: "waoo".to_string(),
             program_type: ProgramType::TracePoint,
@@ -38,23 +38,23 @@ impl ProgramBuilder {
             tracepoint: "sys_enter_open".to_string(),
         }
     }
-     fn name(mut self, name: String) -> Self {
+    fn name(mut self, name: String) -> Self {
         self.name = name;
         self
     }
-     fn program_type(mut self, program_type: ProgramType) -> Self {
+    fn program_type(mut self, program_type: ProgramType) -> Self {
         self.program_type = program_type;
         self
     }
-     fn category(mut self, category: Category) -> Self {
+    fn category(mut self, category: Category) -> Self {
         self.category = category;
         self
     }
-     fn tracepoint(mut self, tracepoint: String) -> Self {
+    fn tracepoint(mut self, tracepoint: String) -> Self {
         self.tracepoint = tracepoint;
         self
     }
-     fn build(self) -> Program {
+    fn build(self) -> Program {
         Program {
             name: self.name,
             program_type: self.program_type,
@@ -65,7 +65,7 @@ impl ProgramBuilder {
 }
 
 impl Program {
-     fn attach(self, ebpf: &mut Ebpf) -> anyhow::Result<()> {
+    fn attach(self, ebpf: &mut Ebpf) -> anyhow::Result<()> {
         let p = match self.program_type {
             ProgramType::TracePoint => {
                 let p: &mut aya::programs::TracePoint =
@@ -79,8 +79,7 @@ impl Program {
     }
 }
 
-
-impl  fmt::Display for Category {
+impl fmt::Display for Category {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Category::Syscalls => write!(f, "syscalls"),
@@ -90,34 +89,57 @@ impl  fmt::Display for Category {
 
 pub fn attach_program(command: Commands, ebpf: &mut Ebpf) {
     match command {
-        Commands::Opensnoop{} => {
+        Commands::Opensnoop {} => {
             ProgramBuilder::new()
                 .category(Category::Syscalls)
                 .program_type(ProgramType::TracePoint)
                 .tracepoint("sys_enter_open".to_string())
                 .name("trace_sys_enter_open".to_string())
-                .build().attach(ebpf).unwrap();
+                .build()
+                .attach(ebpf)
+                .unwrap();
             ProgramBuilder::new()
                 .category(Category::Syscalls)
                 .program_type(ProgramType::TracePoint)
                 .tracepoint("sys_exit_open".to_string())
                 .name("trace_sys_exit_open".to_string())
-                .build().attach(ebpf).unwrap();
+                .build()
+                .attach(ebpf)
+                .unwrap();
             ProgramBuilder::new()
                 .category(Category::Syscalls)
                 .program_type(ProgramType::TracePoint)
                 .tracepoint("sys_enter_openat".to_string())
                 .name("trace_sys_enter_openat".to_string())
-                .build().attach(ebpf).unwrap();
+                .build()
+                .attach(ebpf)
+                .unwrap();
             ProgramBuilder::new()
                 .category(Category::Syscalls)
                 .program_type(ProgramType::TracePoint)
                 .tracepoint("sys_exit_openat".to_string())
                 .name("trace_sys_exit_openat".to_string())
-                .build().attach(ebpf).unwrap();
-        },
-        Commands::Killsnoop{}=>{
-
+                .build()
+                .attach(ebpf)
+                .unwrap();
+        }
+        Commands::Killsnoop {} => {
+            ProgramBuilder::new()
+                .category(Category::Syscalls)
+                .program_type(ProgramType::TracePoint)
+                .tracepoint("sys_enter_kill".to_string())
+                .name("trace_enter_kill".to_string())
+                .build()
+                .attach(ebpf)
+                .unwrap();
+            ProgramBuilder::new()
+                .category(Category::Syscalls)
+                .program_type(ProgramType::TracePoint)
+                .tracepoint("sys_exit_kill".to_string())
+                .name("trace_exit_kill".to_string())
+                .build()
+                .attach(ebpf)
+                .unwrap();
         }
     }
 }
