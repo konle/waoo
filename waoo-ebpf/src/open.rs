@@ -1,15 +1,13 @@
-#![no_std]
-#![no_main]
+// #![no_std]
+// #![no_main]
 use aya_ebpf::{
-    helpers,
-    macros::map,
-    maps::{HashMap, PerfEventArray},
-    programs::TracePointContext,
-    EbpfContext,
+     helpers::{self, bpf_probe_read_kernel}, macros::map, maps::{HashMap, PerfEventArray}, programs::{ ProbeContext, TracePointContext}, EbpfContext
 };
-use waoo_common::{KillLog, OpenLog, COMM_MAX_LEN, NAME_MAX_LEN};
+use waoo_common::{KillLog, OpenLog, TcpConnectLog, COMM_MAX_LEN, NAME_MAX_LEN};
 
-use crate::read_at;
+use crate::{read_at, sock_binding::{sock, sock_common}};
+
+
 
 
 #[map]
@@ -24,6 +22,8 @@ static KILL_EVENTS: PerfEventArray<KillLog> = PerfEventArray::new(0);
 // (pid, sig)
 #[map]
 static KILL_MAPS: HashMap<u64, (u64, u64)> = HashMap::with_max_entries(1024, 0);
+#[map(name = "tcp_events")]
+static TCP_EVENTS: PerfEventArray<TcpConnectLog> = PerfEventArray::new(0);
 
 /**
  *
@@ -211,5 +211,44 @@ pub fn try_exit_kill(ctx: TracePointContext)->Result<u32, u32>{
     };
     KILL_EVENTS.output(&ctx, &data, 0);
     let _ = KILL_MAPS.remove(&tid);
+    Ok(0)
+}
+
+pub fn try_kprobe_tcp_connect(ctx: ProbeContext)->Result<u32, i64>{
+    let sock: *mut sock = ctx.arg(0).ok_or(1u32)?;
+    let sk_common = unsafe {
+         bpf_probe_read_kernel(&(*sock).__sk_common as *const sock_common)
+    }?;
+    // // 目的端口是大端需要转换
+    // let dport = unsafe {
+    //     sk_common.__bindgen_anon_3.__bindgen_anon_1.skc_dport.swap_bytes()
+    // };
+    let event = TcpConnectLog{
+        nsec: unsafe {
+            helpers::bpf_ktime_get_tai_ns()
+        },
+        pid:ctx.pid(),
+        ipv4_src: u32::from_be(unsafe{
+            sk_common.__bindgen_anon_1.__bindgen_anon_1.skc_rcv_saddr
+        }),
+        ipv4_dest: u32::from_be(unsafe {
+            sk_common.__bindgen_anon_1.__bindgen_anon_1.skc_daddr
+        }),
+        ipv6_src: unsafe {
+            sk_common.skc_v6_rcv_saddr.in6_u.u6_addr8
+        },
+        ipv6_dest: unsafe {
+            sk_common.skc_v6_daddr.in6_u.u6_addr8
+        },
+        comm:ctx.command().unwrap_or([0u8; COMM_MAX_LEN]),
+        dport:unsafe {
+            sk_common.__bindgen_anon_3.__bindgen_anon_1.skc_dport.swap_bytes()
+        },
+        lport:unsafe {
+            sk_common.__bindgen_anon_3.__bindgen_anon_1.skc_num
+        },
+        af_net_version: sk_common.skc_family,
+    };
+    TCP_EVENTS.output(&ctx, &event, 0);
     Ok(0)
 }

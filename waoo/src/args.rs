@@ -15,6 +15,8 @@ pub enum Commands {
     Opensnoop{},
     #[command(about="Tracing kill syscalls")]
     Killsnoop{},
+    #[command(about="Tracing tcp connect")]
+    Tcpconnect{},
 }
 
 // #[derive(Debug, Args)]
