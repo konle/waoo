@@ -2,10 +2,12 @@
 #![no_main]
 use aya_ebpf::{
     macros::tracepoint,
+    macros::kprobe,
+    programs::ProbeContext,
     programs::TracePointContext,
 };
 
-use waoo_ebpf::{try_enter_kill, try_exit_kill, try_sys_enter_open};
+use waoo_ebpf::{try_enter_kill, try_exit_kill, try_kprobe_tcp_connect, try_sys_enter_open};
 use waoo_ebpf::try_sys_enter_openat;
 use waoo_ebpf::try_sys_exit_open;
 
@@ -55,6 +57,14 @@ pub fn trace_exit_kill(ctx: TracePointContext)->u32{
     match try_exit_kill(ctx) {
         Ok(ret) => ret,
         Err(ret) => ret,
+    }
+}
+
+#[kprobe]
+pub fn kprobe_tcp_connect(ctx: ProbeContext) -> u32 {
+    match try_kprobe_tcp_connect(ctx) {
+        Ok(ret) => ret,
+        Err(ret) => ret.try_into().unwrap_or(1),
     }
 }
 

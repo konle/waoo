@@ -1,4 +1,3 @@
-use killsnoop::killsnoop;
 #[rustfmt::skip]
 use log::{debug, warn};
 use tokio::signal;
@@ -6,8 +5,8 @@ use tokio::signal;
 mod args;
 mod opensnoop;
 mod program;
-mod killsnoop;
 use opensnoop::opensnoop;
+use waoo::{killsnoop, tcpconnect};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -44,6 +43,9 @@ async fn main() -> anyhow::Result<()> {
         }
         args::Commands::Killsnoop {} => {
             killsnoop(&mut ebpf).await?;
+        }
+        args::Commands::Tcpconnect {} => {
+            tcpconnect(&mut ebpf).await?;
         }
     }
 

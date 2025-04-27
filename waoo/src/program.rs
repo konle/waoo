@@ -21,12 +21,14 @@ struct ProgramBuilder {
 enum ProgramType {
     #[default]
     TracePoint,
+    Kprobe,
 }
 
 #[derive(Default)]
 enum Category {
     #[default]
     Syscalls,
+    Kprobe,
 }
 
 impl ProgramBuilder {
@@ -66,15 +68,23 @@ impl ProgramBuilder {
 
 impl Program {
     fn attach(self, ebpf: &mut Ebpf) -> anyhow::Result<()> {
-        let p = match self.program_type {
+        match self.program_type {
             ProgramType::TracePoint => {
                 let p: &mut aya::programs::TracePoint =
                     ebpf.program_mut(&self.name).unwrap().try_into()?;
-                p
+                    p.load()?;
+                    p.attach(&self.category.to_string(), &self.tracepoint)?;
+
+            },
+            ProgramType::Kprobe => {
+                let p: &mut aya::programs::KProbe =
+                    ebpf.program_mut(&self.name).unwrap().try_into()?;
+                p.load()?;
+                p.attach(&self.tracepoint, 0)?;
             }
         };
-        p.load()?;
-        p.attach(&self.category.to_string(), &self.tracepoint)?;
+        // p.load()?;
+        // p.attach(&self.category.to_string(), &self.tracepoint)?;
         Ok(())
     }
 }
@@ -83,6 +93,7 @@ impl fmt::Display for Category {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Category::Syscalls => write!(f, "syscalls"),
+            Category::Kprobe => write!(f, "kprobe"),
         }
     }
 }
@@ -141,5 +152,13 @@ pub fn attach_program(command: Commands, ebpf: &mut Ebpf) {
                 .attach(ebpf)
                 .unwrap();
         }
+        Commands::Tcpconnect {} => ProgramBuilder::new()
+            .category(Category::Kprobe)
+            .program_type(ProgramType::Kprobe)
+            .tracepoint("tcp_connect".to_string())
+            .name("kprobe_tcp_connect".to_string())
+            .build()
+            .attach(ebpf)
+            .unwrap(),
     }
 }
